@@ -1,5 +1,5 @@
 {
-  "name": "react-native-fs",
+  "name": "winterlightlabs-react-native-fs",
   "version": "2.9.12",
   "description": "Native filesystem access for react-native",
   "main": "FS.common.js",

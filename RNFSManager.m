@@ -603,6 +603,11 @@ RCT_EXPORT_METHOD(stopUpload:(nonnull NSNumber *)jobId)
   }
 }
 
+RCT_EXPORT_METHOD(cleanupUpload:(nonnull NSNumber *)jobId)
+{
+  [self.uploaders removeObjectForKey:[jobId stringValue]];
+}
+
 RCT_EXPORT_METHOD(pathForBundle:(NSString *)bundleNamed
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)

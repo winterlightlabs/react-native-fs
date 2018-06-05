@@ -231,6 +231,10 @@ var RNFS = {
     RNFSManager.stopUpload(jobId);
   },
 
+  cleanupUpload(jobId: number): void {
+    RNFSManager.cleanupUpload(jobId);
+  },
+
   completeHandlerIOS(jobId: number): void {
     return RNFSManager.completeHandlerIOS(jobId);
   },
