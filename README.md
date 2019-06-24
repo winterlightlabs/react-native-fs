@@ -2,6 +2,43 @@
 
 Native filesystem access for react-native
 
+## IMPORTANT
+
+For RN < 0.57 and/or Gradle < 3 you MUST install react-native-fs at version @2.11.17!
+
+For RN >= 0.57 and/or Gradle >= 3 you MUST install react-native-fs at version @2.13.2!
+
+## Changes for v2.13
+- #544 [Android] Add scanFile method
+- #597 [Android] Perform copyFile in background thread to prevent UI blocking
+- #587 [Windows] Fixed implementation for Windows
+- #585 [Android] Fix EISDIR on stat directory
+- #583 [Android] fix Android downloadFile overflow contentLength and bytesWritten
+
+## Changes for v2.12
+- #601 [iOS] Another fix for copyAssetsVideoIOS
+- #599 [iOS] Fix for copyAssetsVideoIOS regarding iCloud-Files
+- #564 [Android] Upgrade to Gradle 3 (BREAKING compatiblity for < RN 0.57)
+- #571 [Android] Fix issue #566 android progress callback not sync and handle uppercase file extension mimetype
+
+## Changes for v2.11
+- Prepared for RN 0.56 thanx to [#535](https://github.com/itinance/react-native-fs/pull/535) by [rmevans9](https://github.com/rmevans9)
+- #503 make sure to return the original file uri if content:// scheme is not used
+- #510 Fixes an IndexOutOfBounds while uploading files in Android
+- #515 Add cacheable option to downloadFile on iOScompletion callback
+- #516 [iOS] Ensure _bytesWritten is correct in download
+- #519 updated compilesdkversion and buildtoolsversion
+- #535 Make this work with RN56
+- #558 [Android] fixed missing parameter in movefile and writefile
+- #557 [Android] copyFile: fix missing parameter on Android
+- #564 [Android] Replace deprecated 'compile' gradle configuration with 'implementation
+
+## Changes for v2.10
+- UploadFiles is now also available for Android [#486](https://github.com/itinance/react-native-fs/pull/486) by [hank121314](https://github.com/hank121314)
+- Fixed a memory leak that caused after running many simultaneous upload jobs on iOS [#502](https://github.com/itinance/react-native-fs/pull/502) by [Ignigena](https://github.com/Ignigena)
+- Android: Resolve filepath for content URI [480](https://github.com/itinance/react-native-fs/pull/480) by [andtos90](https://github.com/andtos90)
+- (Android only) Add ExternalCachesDirectoryPath [490](https://github.com/itinance/react-native-fs/pull/490) by [superandrew213](https://github.com/superandrew213)
+
 ## Changes for v2.9
 - (iOS only) Resumable downloads and better background downloads handling [#335](https://github.com/itinance/react-native-fs/pull/335) by [ptelad](https://github.com/ptelad)
 - (Android only) getAllExternalFilesDirs() added by [ngrj](https://github.com/ngrj)
@@ -228,7 +265,7 @@ RNFS.readDir(RNFS.MainBundlePath) // On Android, use "RNFS.DocumentDirectoryPath
 var RNFS = require('react-native-fs');
 
 // create a path you want to write to
-// :warning: on iOS, you cannot write into `RNFS.MainBundlePath`, 
+// :warning: on iOS, you cannot write into `RNFS.MainBundlePath`,
 // but `RNFS.DocumentDirectoryPath` exists on both platforms and is writable
 var path = RNFS.DocumentDirectoryPath + '/test.txt';
 
@@ -258,7 +295,7 @@ return RNFS.unlink(path)
   });
 ```
 
-### File upload (iOS only)
+### File upload
 
 ```javascript
 // require the module
@@ -327,11 +364,14 @@ The following constants are available on the `RNFS` export:
 
 - `MainBundlePath` (`String`) The absolute path to the main bundle directory (not available on Android)
 - `CachesDirectoryPath` (`String`) The absolute path to the caches directory
+- `ExternalCachesDirectoryPath` (`String`) The absolute path to the external caches directory (android only)
 - `DocumentDirectoryPath`  (`String`) The absolute path to the document directory
 - `TemporaryDirectoryPath` (`String`) The absolute path to the temporary directory (falls back to Caching-Directory on Android)
 - `LibraryDirectoryPath` (`String`) The absolute path to the NSLibraryDirectory (iOS only)
 - `ExternalDirectoryPath` (`String`) The absolute path to the external files, shared directory (android only)
 - `ExternalStorageDirectoryPath` (`String`) The absolute path to the external storage, shared directory (android only)
+
+IMPORTANT: when using `ExternalStorageDirectoryPath` it's necessary to request permissions (on Android) to read and write on the external storage, here an example: [React Native Offical Doc] (https://facebook.github.io/react-native/docs/permissionsandroid)
 
 ### `readDir(dirpath: string): Promise<ReadDirItem[]>`
 
@@ -378,15 +418,17 @@ Node.js style version of `readDir` that returns only the names. Note the lowerca
 
 ### `stat(filepath: string): Promise<StatResult>`
 
-Stats an item at `path`.
+Stats an item at `filepath`. If the `filepath` is linked to a virtual file, for example Android Content URI, the `originalPath` can be used to find the pointed file path.
 The promise resolves with an object with the following properties:
 
 ```
 type StatResult = {
+  path:            // The same as filepath argument
   ctime: date;     // The creation date of the file
   mtime: date;     // The last modified date of the file
   size: string;     // Size in bytes
   mode: number;     // UNIX file mode
+  originalFilepath: string;    // ANDROID: In case of content uri this is the pointed file path, otherwise is the same as path
   isFile: () => boolean;        // Is the file just a file?
   isDirectory: () => boolean;   // Is the file a directory?
 };
@@ -409,6 +451,12 @@ Note: reading big files piece by piece using this method may be useful in terms 
 Reads the file at `path` in the Android app's assets folder and return contents. `encoding` can be one of `utf8` (default), `ascii`, `base64`. Use `base64` for reading binary files.
 
 `filepath` is the relative path to the file from the root of the `assets` folder.
+
+Note: Android only.
+
+### `readFileRes(filename:string, encoding?: string): Promise<string>`
+
+Reads the file named `filename` in the Android app's res folder and return contents. `res/drawable` is used as the parent folder for image files, `res/raw` for everything else. `encoding` can be one of `utf8` (default), `ascii`, `base64`. Use `base64` for reading binary files.
 
 Note: Android only.
 
@@ -438,7 +486,13 @@ Note: On Android copyFile will overwrite `destPath` if it already exists. On iOS
 
 Copies the file at `filepath` in the Android app's assets folder and copies it to the given `destPath ` path.
 
-Note: Android only. Will overwrite destPath if it already exists
+Note: Android only. Will overwrite destPath if it already exists.
+
+### `copyFileRes(filename: string, destPath: string): Promise<void>`
+
+Copies the file named `filename` in the Android app's res folder and copies it to the given `destPath ` path. `res/drawable` is used as the source parent folder for image files, `res/raw` for everything else.
+
+Note: Android only. Will overwrite destPath if it already exists.
 
 ### `copyAssetsFileIOS(imageUri: string, destPath: string, width: number, height: number, scale : number = 1.0, compression : number = 1.0, resizeMode : string = 'contain'  ): Promise<string>`
 
@@ -478,6 +532,14 @@ Check if the item exists at `filepath`. If the item does not exist, return false
 
 Check in the Android assets folder if the item exists. `filepath` is the relative path from the root of the assets folder. If the item does not exist, return false.
 
+Note: Android only.
+
+### `existsRes(filename: string): Promise<boolean>`
+
+Check in the Android res folder if the item named `filename` exists. `res/drawable` is used as the parent folder for image files, `res/raw` for everything else. If the item does not exist, return false.
+
+Note: Android only.
+
 ### `hash(filepath: string, algorithm: string): Promise<string>`
 
 Reads the file at `path` and returns its checksum as determined by `algorithm`, which can be one of `md5`, `sha1`, `sha224`, `sha256`, `sha384`, `sha512`.
@@ -507,6 +569,7 @@ type DownloadFileOptions = {
   headers?: Headers;        // An object of headers to be passed to the server
   background?: boolean;     // Continue the download in the background after the app terminates (iOS only)
   discretionary?: boolean;  // Allow the OS to control the timing and speed of the download to improve perceived performance  (iOS only)
+  cacheable?: boolean;      // Whether the download can be stored in the shared NSURLCache (iOS only, defaults to true)
   progressDivider?: number;
   begin?: (res: DownloadBeginCallbackResult) => void;
   progress?: (res: DownloadProgressCallbackResult) => void;
@@ -581,9 +644,9 @@ if (await RNFS.isResumable(jobId) {
 
 For use when using background downloads, tell iOS you are done handling a completed download.
 
-Read more about background donwloads in the [Background Downloads Tutorial (iOS)](#background-downloads-tutorial-ios) section.
+Read more about background downloads in the [Background Downloads Tutorial (iOS)](#background-downloads-tutorial-ios) section.
 
-### (iOS only) `uploadFiles(options: UploadFileOptions): { jobId: number, promise: Promise<UploadResult> }`
+### `uploadFiles(options: UploadFileOptions): { jobId: number, promise: Promise<UploadResult> }`
 
 `options` (`Object`) - An object containing named parameters
 
@@ -654,9 +717,13 @@ type FSInfoResult = {
 };
 ```
 
+### (Android only) `scanFile(path: string): Promise<string[]>`
+
+Scan the file using [Media Scanner](https://developer.android.com/reference/android/media/MediaScannerConnection).
+
 ### (Android only) `getAllExternalFilesDirs(): Promise<string[]>`
 
-Returns an array with the absolute paths to application-specific directories on all shared/external storage devices where the application can place persistent files it owns. 
+Returns an array with the absolute paths to application-specific directories on all shared/external storage devices where the application can place persistent files it owns.
 
 ### (iOS only) `pathForGroup(groupIdentifier: string): Promise<string>`
 
